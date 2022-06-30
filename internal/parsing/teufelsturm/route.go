@@ -1,57 +1,114 @@
 package teufelsturm
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"io"
+	"regexp"
+	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/jomaresch/climbDB/internal/model"
+	"go.uber.org/zap"
 )
 
-const SummitOverviewTable = "body > table:nth-child(2) > tbody > tr > td:nth-child(2) > table > tbody > tr > td > div > table > tbody"
+const routeTableSelector = "body > table > tbody > tr > td > table > tbody > tr > td > div > table > tbody"
+const commentTableSelector = "body > table > tbody > tr > td > table > tbody > tr > td > table > tbody"
 
-func ParseSummitList(ctx context.Context, page io.Reader, areaMap map[string]string) ([]*model.Summit, error) {
+var routeIdExtractor = regexp.MustCompile(`\d+$`)
+var createdTimeExtractor = regexp.MustCompile(`\d{2}.\d{2}.\d{4} \d{2}:\d{2}$`)
+
+func extractRouteID(regionLink string) string {
+	return routeIdExtractor.FindString(regionLink)
+}
+
+func extractCreatedTime(columnText string) (time.Time, error) {
+	return time.Parse("02.01.2006 15:04", createdTimeExtractor.FindString(columnText))
+}
+
+func ParseRouteList(page io.Reader, summitMapping map[string]string) ([]*model.Route, error) {
 	d, err := goquery.NewDocumentFromReader(page)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create document from reader: %w", err)
+		return nil, fmt.Errorf("failed to create goquery document: %w", err)
 	}
-	var parsingErrors []error
-	var summits []*model.Summit
 
-	d.Find(SummitOverviewTable).Children().Each(func(index int, row *goquery.Selection) {
+	var routes []*model.Route
+
+	d.Find(routeTableSelector).Children().Each(func(index int, row *goquery.Selection) {
 		// Skip the table header.
 		if index == 0 {
 			return
 		}
 		// Here we parse the columns.
-		summit := &model.Summit{}
+		route := &model.Route{}
+		row.Children().Each(func(i int, col *goquery.Selection) {
+			switch i {
+			case 1:
+				summitName := col.Children().First().Text()
+				summitID, ok := summitMapping[summitName]
+				if !ok {
+					zap.L().Warn("no matching summit id found", zap.String("summit_name", summitName))
+				}
+				route.SummitID = summitID
+			case 2:
+				routeLinkElement := col.Children().First().Children().First()
+				routeUrl, _ := routeLinkElement.Attr("href")
+				route.DisplayName = routeLinkElement.Text()
+				route.ID = extractRouteID(routeUrl)
+			case 3:
+				rating, err := ParseRatingFromPictureElement(col.Children().First().Children().First())
+				if err != nil {
+					zap.L().Error("failed to parse rating", zap.Error(err))
+				}
+				route.AvgRating = rating
+			case 4:
+				grading := ParseGradeFromElement(col.Children().First())
+				route.GradeID = grading.GradeID
+				route.GuideRating = grading.GuideRating
+				route.RedPointGradeID = grading.RedPointGradeID
+				route.SuggestedGradeID = grading.SuggestedGradeID
+				route.JumpGrade = grading.JumpGrade
+			}
+		})
+		routes = append(routes, route)
+	})
+
+	return routes, nil
+}
+
+func ParseRouteDetails(page io.Reader) ([]*model.Comment, error) {
+	d, err := goquery.NewDocumentFromReader(page)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create goquery document: %w", err)
+	}
+
+	var comments []*model.Comment
+
+	t := d.Find(commentTableSelector)
+	t.Children().Each(func(index int, row *goquery.Selection) {
+		// Skip the table header.
+		if index == 0 {
+			return
+		}
+		// Here we parse the columns.
+		comment := &model.Comment{}
 		row.Children().Each(func(i int, col *goquery.Selection) {
 			switch i {
 			case 0:
-				summit.ID = col.Text()
-			case 1:
-				summit.DisplayName = col.Text()
-			case 2:
-				summit.GuideID = col.Text()
-			case 3:
-				regionID, ok := areaMap[col.Text()]
-				if !ok {
-					parsingErrors = append(parsingErrors, fmt.Errorf("no Id for region '%s' found", col.Text()))
-					return
+				comment.Author = col.Children().First().Text()
+				createdTime, err := extractCreatedTime(col.Text())
+				if err != nil {
+					zap.L().Error("failed to parse created time", zap.Error(err))
 				}
-				summit.Region = regionID
+				comment.CreatedTime = createdTime
+			case 1:
+				comment.Text = strings.TrimLeft(col.Text(), " ")
+			case 2:
+				comment.Rating = ParseRatingFromText(col.Text())
 			}
 		})
-		summits = append(summits, summit)
+		comments = append(comments, comment)
 	})
-	if len(parsingErrors) != 0 {
-		cumErrorString := ""
-		for _, err := range parsingErrors {
-			cumErrorString = fmt.Sprintf("%s, %s", cumErrorString, err.Error())
-		}
-		return nil, errors.New(cumErrorString)
-	}
-	return summits, nil
+
+	return comments, nil
 }
