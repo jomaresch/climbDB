@@ -19,7 +19,7 @@ type TeufelsturmGrading struct {
 
 func ParseGradeFromElement(element *goquery.Selection) *TeufelsturmGrading {
 	grading := &TeufelsturmGrading{}
-	gradingText := element.Text()
+	gradingText := strings.TrimSpace(element.Text())
 	gradingElements := strings.Split(gradingText, " ")
 
 	nextGradeIsRedPoint := false
@@ -35,25 +35,25 @@ func ParseGradeFromElement(element *goquery.Selection) *TeufelsturmGrading {
 			case "**":
 				grading.GuideRating = 2
 			}
-			break
+			continue
 		}
 
 		if strings.Contains(g, "RP") {
 			nextGradeIsRedPoint = true
-			break
+			continue
 		}
 
 		if nextGradeIsRedPoint {
 			grading.RedPointGradeID = getGradeIDForSaxonyGrade(g)
 			nextGradeIsRedPoint = false
-			break
+			continue
 		}
 
 		if strings.ContainsAny(g, "()") {
 			cleanGrade := strings.ReplaceAll(g, "(", "")
 			cleanGrade = strings.ReplaceAll(cleanGrade, ")", "")
 			grading.SuggestedGradeID = getGradeIDForSaxonyGrade(cleanGrade)
-			break
+			continue
 		}
 
 		if strings.Contains(g, "/") {
@@ -65,22 +65,22 @@ func ParseGradeFromElement(element *goquery.Selection) *TeufelsturmGrading {
 			grading.JumpGrade = jumpGrade
 			g = jumpGradeList[1]
 			grading.GradeID = getGradeIDForSaxonyGrade(g)
-			break
+			continue
 		}
 
 		if jumpGrade, err := strconv.Atoi(g); err == nil {
 			grading.JumpGrade = jumpGrade
-			break
+			continue
 		}
 
 		if strings.HasPrefix(strings.ToLower(g), "s") {
 			jumpGrade, _ := strconv.Atoi(strings.TrimPrefix(strings.ToLower(g), "s"))
 			grading.JumpGrade = jumpGrade
-			break
+			continue
 		}
 
 		if strings.ContainsAny(g, "-?") {
-			break
+			continue
 		}
 
 		grading.GradeID = getGradeIDForSaxonyGrade(g)

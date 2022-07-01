@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/jomaresch/climbDB/internal/database/models"
 	"github.com/jomaresch/climbDB/internal/model"
@@ -163,4 +164,40 @@ func (t *TeufelsturmManager) ListRoutes(ctx context.Context) (map[string]*model.
 		}
 	}
 	return routes, nil
+}
+
+func (t *TeufelsturmManager) InsertComment(ctx context.Context, comment *model.Comment, updateIfExists bool) error {
+	l := zap.L().With(zap.String("id", comment.ID))
+	auth := int64(0)
+	if comment.AuthenticatedAuthor {
+		auth = 1
+	}
+	ttComment := &models.TTComment{
+		ID:                  comment.ID,
+		Author:              comment.Author,
+		CreatedTime:         comment.CreatedTime.Format(time.RFC3339),
+		AuthenticatedAuthor: auth,
+		Text:                comment.Text,
+		Rating:              int64(comment.Rating),
+		RouteID:             comment.RouteID,
+	}
+	exists, err := models.TTCommentExists(ctx, t.db, comment.ID)
+	if err != nil {
+		return fmt.Errorf("failed to check if comment exists: %w", err)
+	}
+	if exists && !updateIfExists {
+		l.Debug("Comment already exists, skipping update.")
+		return nil
+	}
+	if exists && updateIfExists {
+		l.Debug("Comment already exists, updating route in db.")
+		_, err = ttComment.Update(ctx, t.db, boil.Infer())
+	} else {
+		l.Debug("Insert new comment in db.")
+		err = ttComment.Insert(ctx, t.db, boil.Infer())
+	}
+	if err != nil {
+		return fmt.Errorf("failed to update/insert comment: %w", err)
+	}
+	return nil
 }

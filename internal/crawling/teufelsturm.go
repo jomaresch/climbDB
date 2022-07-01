@@ -119,7 +119,7 @@ func (t *TeufelsturmCrawler) ExtractComments(ctx context.Context, routeId string
 	if err != nil {
 		return nil, fmt.Errorf("failed to get route details: %w", err)
 	}
-	comments, err := teufelsturm.ParseRouteDetails(resp.RawBody())
+	comments, err := teufelsturm.ParseRouteDetails(resp.RawBody(), routeId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse route details: %w", err)
 	}

@@ -13,7 +13,7 @@ import (
 
 func init() {
 	cfg := zap.NewProductionConfig()
-	cfg.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
+	cfg.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
 	l, _ := cfg.Build()
 	zap.ReplaceGlobals(l)
 }
@@ -27,7 +27,7 @@ func main() {
 	client := resty.New()
 	teufelsturmCrawler := crawling.NewTeufelsturmCrawler(client)
 
-	storeAllRoutes(teufelsturmCrawler, m)
+	storeAllComments(teufelsturmCrawler, m)
 
 	//regionsMapping := model.MapRegionsNames(regions)
 	//summits, err := teufelsturmCrawler.ExtractAllSummits(context.Background(), regionsMapping)
@@ -75,6 +75,24 @@ func storeAllRoutes(tc *crawling.TeufelsturmCrawler, tm *database.TeufelsturmMan
 	for _, route := range routes {
 		err = tm.InsertRoute(context.Background(), route, true)
 		fatalOnError("failed to store route", err)
+	}
+}
+
+func storeAllComments(tc *crawling.TeufelsturmCrawler, tm *database.TeufelsturmManager) {
+	routesMap, err := tm.ListRoutes(context.Background())
+	fatalOnError("failed to load all routes", err)
+	count := 0
+	for key := range routesMap {
+		count++
+		comments, err := tc.ExtractComments(context.Background(), key)
+		if count%100 == 0 {
+			zap.S().Info(float64(count) / float64(len(routesMap)))
+		}
+		fatalOnError("failed to crawl comments for route", err)
+		for _, comment := range comments {
+			err = tm.InsertComment(context.Background(), comment, true)
+			fatalOnError("failed to store comment", err)
+		}
 	}
 }
 

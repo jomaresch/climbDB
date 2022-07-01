@@ -7,6 +7,7 @@ import (
 
 type Comment struct {
 	ID                  string
+	RouteID             string
 	Author              string
 	CreatedTime         time.Time
 	AuthenticatedAuthor bool

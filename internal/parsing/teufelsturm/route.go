@@ -2,8 +2,10 @@ package teufelsturm
 
 import (
 	"fmt"
+	"hash/crc32"
 	"io"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -76,7 +78,7 @@ func ParseRouteList(page io.Reader, summitMapping map[string]string) ([]*model.R
 	return routes, nil
 }
 
-func ParseRouteDetails(page io.Reader) ([]*model.Comment, error) {
+func ParseRouteDetails(page io.Reader, routeID string) ([]*model.Comment, error) {
 	d, err := goquery.NewDocumentFromReader(page)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create goquery document: %w", err)
@@ -91,7 +93,7 @@ func ParseRouteDetails(page io.Reader) ([]*model.Comment, error) {
 			return
 		}
 		// Here we parse the columns.
-		comment := &model.Comment{}
+		comment := &model.Comment{RouteID: routeID}
 		row.Children().Each(func(i int, col *goquery.Selection) {
 			switch i {
 			case 0:
@@ -100,15 +102,21 @@ func ParseRouteDetails(page io.Reader) ([]*model.Comment, error) {
 				if err != nil {
 					zap.L().Error("failed to parse created time", zap.Error(err))
 				}
+				comment.AuthenticatedAuthor = strings.Contains(col.Text(), "Authentifizierter")
 				comment.CreatedTime = createdTime
 			case 1:
-				comment.Text = strings.TrimLeft(col.Text(), " ")
+				comment.Text = strings.TrimSpace(col.Text())
 			case 2:
 				comment.Rating = ParseRatingFromText(col.Text())
 			}
 		})
+
+		commentHash := crc32.ChecksumIEEE(append(append([]byte(comment.Text), []byte(comment.RouteID)...), []byte(comment.Author)...))
+		comment.ID = strconv.FormatInt(int64(commentHash), 16)
 		comments = append(comments, comment)
 	})
-
+	if len(comments) == 0 {
+		zap.L().Error("no comments for route", zap.String("route", routeID))
+	}
 	return comments, nil
 }

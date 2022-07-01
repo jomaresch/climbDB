@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/friendsofgo/errors"
-	"github.com/volatiletech/null/v8"
 	"github.com/volatiletech/sqlboiler/v4/boil"
 	"github.com/volatiletech/sqlboiler/v4/queries"
 	"github.com/volatiletech/sqlboiler/v4/queries/qm"
@@ -23,12 +22,13 @@ import (
 
 // TTComment is an object representing the database table.
 type TTComment struct {
-	ID                  string     `boil:"id" json:"id" toml:"id" yaml:"id"`
-	Author              string     `boil:"author" json:"author" toml:"author" yaml:"author"`
-	CreatedTime         string     `boil:"created_time" json:"created_time" toml:"created_time" yaml:"created_time"`
-	AuthenticatedAuthor null.Int64 `boil:"authenticated_author" json:"authenticated_author,omitempty" toml:"authenticated_author" yaml:"authenticated_author,omitempty"`
-	Text                string     `boil:"text" json:"text" toml:"text" yaml:"text"`
-	Rating              int64      `boil:"rating" json:"rating" toml:"rating" yaml:"rating"`
+	ID                  string `boil:"id" json:"id" toml:"id" yaml:"id"`
+	Author              string `boil:"author" json:"author" toml:"author" yaml:"author"`
+	CreatedTime         string `boil:"created_time" json:"created_time" toml:"created_time" yaml:"created_time"`
+	AuthenticatedAuthor int64  `boil:"authenticated_author" json:"authenticated_author" toml:"authenticated_author" yaml:"authenticated_author"`
+	Text                string `boil:"text" json:"text" toml:"text" yaml:"text"`
+	Rating              int64  `boil:"rating" json:"rating" toml:"rating" yaml:"rating"`
+	RouteID             string `boil:"route_id" json:"route_id" toml:"route_id" yaml:"route_id"`
 
 	R *ttCommentR `boil:"-" json:"-" toml:"-" yaml:"-"`
 	L ttCommentL  `boil:"-" json:"-" toml:"-" yaml:"-"`
@@ -41,6 +41,7 @@ var TTCommentColumns = struct {
 	AuthenticatedAuthor string
 	Text                string
 	Rating              string
+	RouteID             string
 }{
 	ID:                  "id",
 	Author:              "author",
@@ -48,6 +49,7 @@ var TTCommentColumns = struct {
 	AuthenticatedAuthor: "authenticated_author",
 	Text:                "text",
 	Rating:              "rating",
+	RouteID:             "route_id",
 }
 
 var TTCommentTableColumns = struct {
@@ -57,6 +59,7 @@ var TTCommentTableColumns = struct {
 	AuthenticatedAuthor string
 	Text                string
 	Rating              string
+	RouteID             string
 }{
 	ID:                  "tt_comment.id",
 	Author:              "tt_comment.author",
@@ -64,6 +67,7 @@ var TTCommentTableColumns = struct {
 	AuthenticatedAuthor: "tt_comment.authenticated_author",
 	Text:                "tt_comment.text",
 	Rating:              "tt_comment.rating",
+	RouteID:             "tt_comment.route_id",
 }
 
 // Generated where
@@ -90,30 +94,6 @@ func (w whereHelperstring) NIN(slice []string) qm.QueryMod {
 	}
 	return qm.WhereNotIn(fmt.Sprintf("%s NOT IN ?", w.field), values...)
 }
-
-type whereHelpernull_Int64 struct{ field string }
-
-func (w whereHelpernull_Int64) EQ(x null.Int64) qm.QueryMod {
-	return qmhelper.WhereNullEQ(w.field, false, x)
-}
-func (w whereHelpernull_Int64) NEQ(x null.Int64) qm.QueryMod {
-	return qmhelper.WhereNullEQ(w.field, true, x)
-}
-func (w whereHelpernull_Int64) LT(x null.Int64) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.LT, x)
-}
-func (w whereHelpernull_Int64) LTE(x null.Int64) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.LTE, x)
-}
-func (w whereHelpernull_Int64) GT(x null.Int64) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.GT, x)
-}
-func (w whereHelpernull_Int64) GTE(x null.Int64) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.GTE, x)
-}
-
-func (w whereHelpernull_Int64) IsNull() qm.QueryMod    { return qmhelper.WhereIsNull(w.field) }
-func (w whereHelpernull_Int64) IsNotNull() qm.QueryMod { return qmhelper.WhereIsNotNull(w.field) }
 
 type whereHelperint64 struct{ field string }
 
@@ -142,16 +122,18 @@ var TTCommentWhere = struct {
 	ID                  whereHelperstring
 	Author              whereHelperstring
 	CreatedTime         whereHelperstring
-	AuthenticatedAuthor whereHelpernull_Int64
+	AuthenticatedAuthor whereHelperint64
 	Text                whereHelperstring
 	Rating              whereHelperint64
+	RouteID             whereHelperstring
 }{
 	ID:                  whereHelperstring{field: "\"tt_comment\".\"id\""},
 	Author:              whereHelperstring{field: "\"tt_comment\".\"author\""},
 	CreatedTime:         whereHelperstring{field: "\"tt_comment\".\"created_time\""},
-	AuthenticatedAuthor: whereHelpernull_Int64{field: "\"tt_comment\".\"authenticated_author\""},
+	AuthenticatedAuthor: whereHelperint64{field: "\"tt_comment\".\"authenticated_author\""},
 	Text:                whereHelperstring{field: "\"tt_comment\".\"text\""},
 	Rating:              whereHelperint64{field: "\"tt_comment\".\"rating\""},
+	RouteID:             whereHelperstring{field: "\"tt_comment\".\"route_id\""},
 }
 
 // TTCommentRels is where relationship names are stored.
@@ -171,8 +153,8 @@ func (*ttCommentR) NewStruct() *ttCommentR {
 type ttCommentL struct{}
 
 var (
-	ttCommentAllColumns            = []string{"id", "author", "created_time", "authenticated_author", "text", "rating"}
-	ttCommentColumnsWithoutDefault = []string{"id", "author", "created_time", "authenticated_author", "text", "rating"}
+	ttCommentAllColumns            = []string{"id", "author", "created_time", "authenticated_author", "text", "rating", "route_id"}
+	ttCommentColumnsWithoutDefault = []string{"id", "author", "created_time", "authenticated_author", "text", "rating", "route_id"}
 	ttCommentColumnsWithDefault    = []string{}
 	ttCommentPrimaryKeyColumns     = []string{"id"}
 )

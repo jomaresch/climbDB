@@ -568,7 +568,7 @@ func testTTCommentsSelect(t *testing.T) {
 }
 
 var (
-	ttCommentDBTypes = map[string]string{`ID`: `TEXT`, `Author`: `TEXT`, `CreatedTime`: `TEXT`, `AuthenticatedAuthor`: `INTEGER`, `Text`: `TEXT`, `Rating`: `INTEGER`}
+	ttCommentDBTypes = map[string]string{`ID`: `TEXT`, `Author`: `TEXT`, `CreatedTime`: `TEXT`, `AuthenticatedAuthor`: `INTEGER`, `Text`: `TEXT`, `Rating`: `INTEGER`, `RouteID`: `TEXT`}
 	_                = bytes.MinRead
 )
 
